@@ -10,7 +10,7 @@ pkg update -y
 
 pkg install libxml2 
 
-pip install libxslt 
+pkg install libxslt 
 
 pip install libxml2-dev 
 
