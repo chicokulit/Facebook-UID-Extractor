@@ -12,9 +12,9 @@ pkg install libxml2
 
 pkg install libxslt 
 
-pip install libxml2-dev 
+pkg install libxml2-dev 
 
-pip install libxslt-dev 
+pkg install libxslt-dev 
 
 pip install clang 
 
