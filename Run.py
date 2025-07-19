@@ -2,70 +2,65 @@ import requests
 import re
 from bs4 import BeautifulSoup
 
-def resolve_share_link(url):
-    try:
-        response = requests.get(url, allow_redirects=True)
-        final_url = response.url
-        print(f"[ℹ️] Redirected to: {final_url}")
-        return final_url
-    except Exception as e:
-        print(f"[❌] Error resolving share link: {e}")
-        return None
-
-def extract_uid_from_url(url):
-    # Case 1: Direct UID in URL (profile.php?id=...)
-    match = re.search(r'profile\.php\?id=(\d+)', url)
-    if match:
-        return match.group(1)
-
-    # Case 2: Username-based URL (like /zuck)
-    match = re.search(r'facebook\.com/([^/?&]+)', url)
-    if match:
-        username = match.group(1)
-        return resolve_username_to_uid(username)
-
-    return None
-
-def resolve_username_to_uid(username):
+def resolve_url(url):
     try:
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+            "User-Agent": "Mozilla/5.0"
         }
-        url = f"https://mbasic.facebook.com/{username}"
-        response = requests.get(url, headers=headers)
-        soup = BeautifulSoup(response.text, "html.parser")
+        response = requests.get(url, headers=headers, allow_redirects=True, timeout=10)
+        return response.url
+    except requests.RequestException:
+        return None
 
-        # Find profile.php?id= in the page
-        for a in soup.find_all('a', href=True):
-            href = a['href']
-            match = re.search(r'profile\.php\?id=(\d+)', href)
-            if match:
-                return match.group(1)
+def extract_uid_from_html(html):
+    patterns = [
+        r'"userID":"(\d+)"',
+        r'"entity_id":"(\d+)"',
+        r'"fb://profile/(\d+)"',
+        r'"pageID":"(\d+)"',
+        r'id=(\d+)'  # fallback
+    ]
 
-    except Exception as e:
-        print(f"[❌] Error resolving username: {e}")
+    for pattern in patterns:
+        match = re.search(pattern, html)
+        if match:
+            return match.group(1)
+    
+    # Additional fallback using meta tags
+    soup = BeautifulSoup(html, 'html.parser')
+    meta = soup.find("meta", attrs={"property": "al:android:url"})
+    if meta and "content" in meta.attrs:
+        match = re.search(r'id=(\d+)', meta["content"])
+        if match:
+            return match.group(1)
+
     return None
 
+def extract_uid_from_url(url):
+    resolved_url = resolve_url(url)
+    if not resolved_url:
+        return None
+    
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0"
+        }
+        response = requests.get(resolved_url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            return extract_uid_from_html(response.text)
+    except requests.RequestException:
+        return None
+
 def main():
-    print("🔍 Facebook UID Extractor Tool")
-    print("-----------------------------")
-    url = input("📎 Enter Facebook Profile/Page/Post URL: ").strip()
-
-    if "facebook.com/share/" in url:
-        print("[🔄] Detected share link. Resolving...")
-        resolved_url = resolve_share_link(url)
-        if resolved_url:
-            print(f"[🔗] Using resolved URL: {resolved_url}")
-            uid = extract_uid_from_url(resolved_url)
-        else:
-            uid = None
-    else:
-        uid = extract_uid_from_url(url)
-
+    print("📎 Enter Facebook Share/Profile/Page/Post URL: ", end="")
+    url = input().strip()
+    
+    uid = extract_uid_from_url(url)
+    
     if uid:
-        print(f"✅ UID Extracted: {uid}")
+        print(f"UID: {uid}")
     else:
-        print("❌ Could not extract UID from the given URL.")
+        print("❌ UID could not be extracted.")
 
 if __name__ == "__main__":
     main()
