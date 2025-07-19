@@ -1,66 +1,69 @@
-import re
 import requests
+import re
 from bs4 import BeautifulSoup
 
-def resolve_final_url(url):
+def resolve_share_link(url):
     try:
-        response = requests.get(url, allow_redirects=True, timeout=10)
-        if response.history:
-            print(f"[ℹ️] Redirected to: {response.url}")
-        return response.url
-    except requests.exceptions.RequestException as e:
-        print(f"[!] Error resolving URL: {e}")
+        response = requests.get(url, allow_redirects=True)
+        final_url = response.url
+        print(f"[ℹ️] Redirected to: {final_url}")
+        return final_url
+    except Exception as e:
+        print(f"[❌] Error resolving share link: {e}")
         return None
 
-def extract_uid_from_html(html):
-    soup = BeautifulSoup(html, 'html.parser')
-    
-    # Look for entity_id
-    match = re.search(r'"entity_id":"(\d+)"', html)
+def extract_uid_from_url(url):
+    # Case 1: Direct UID in URL (profile.php?id=...)
+    match = re.search(r'profile\.php\?id=(\d+)', url)
     if match:
         return match.group(1)
-    
-    # Try meta property if entity_id fails
-    meta = soup.find("meta", property="al:android:url")
-    if meta and meta.get("content"):
-        match = re.search(r'fb://profile/(\d+)', meta["content"])
-        if match:
-            return match.group(1)
-    
+
+    # Case 2: Username-based URL (like /zuck)
+    match = re.search(r'facebook\.com/([^/?&]+)', url)
+    if match:
+        username = match.group(1)
+        return resolve_username_to_uid(username)
+
     return None
 
-def get_facebook_uid(url):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-    }
+def resolve_username_to_uid(username):
     try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code != 200:
-            print(f"[!] Failed to access URL, status code: {response.status_code}")
-            return None
-        return extract_uid_from_html(response.text)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        }
+        url = f"https://mbasic.facebook.com/{username}"
+        response = requests.get(url, headers=headers)
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # Find profile.php?id= in the page
+        for a in soup.find_all('a', href=True):
+            href = a['href']
+            match = re.search(r'profile\.php\?id=(\d+)', href)
+            if match:
+                return match.group(1)
+
     except Exception as e:
-        print(f"[!] Exception occurred: {e}")
-        return None
+        print(f"[❌] Error resolving username: {e}")
+    return None
 
 def main():
     print("🔍 Facebook UID Extractor Tool")
     print("-----------------------------")
-    input_url = input("📎 Enter Facebook Profile/Page/Post URL: ").strip()
+    url = input("📎 Enter Facebook Profile/Page/Post URL: ").strip()
 
-    if "/share/" in input_url:
+    if "facebook.com/share/" in url:
         print("[🔄] Detected share link. Resolving...")
-        final_url = resolve_final_url(input_url)
-        if not final_url:
-            print("❌ Could not resolve the shared URL.")
-            return
-        input_url = final_url
-
-    print(f"[🔗] Using resolved URL: {input_url}")
-    uid = get_facebook_uid(input_url)
+        resolved_url = resolve_share_link(url)
+        if resolved_url:
+            print(f"[🔗] Using resolved URL: {resolved_url}")
+            uid = extract_uid_from_url(resolved_url)
+        else:
+            uid = None
+    else:
+        uid = extract_uid_from_url(url)
 
     if uid:
-        print(f"✅ Facebook UID: {uid}")
+        print(f"✅ UID Extracted: {uid}")
     else:
         print("❌ Could not extract UID from the given URL.")
 
