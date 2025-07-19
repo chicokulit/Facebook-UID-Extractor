@@ -10,4 +10,4 @@ git clone https://github.com/chicokulit/Facebook-UID-Extractor.git
 
 cd Facebook-UID-Extractor
 
-python run.py
+python Run.py
