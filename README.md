@@ -6,19 +6,9 @@ pip install requests
 
 pip install beautifulsoup4 
 
-pkg update -y
+pkg update -y 
 
-pkg install libxml2 
-
-pkg install libxslt 
-
-pkg install libxml2-dev 
-
-pkg install libxslt-dev 
-
-pip install clang 
-
-pip install python-dev -y 
+pkg install libxml2 libxslt clang python
 
 pip install lxml
 
